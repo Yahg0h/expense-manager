@@ -115,3 +115,38 @@ class BudgetResponse(BaseModel):
     limit_amount: Decimal = Field(decimal_places=2, max_digits=10)
     month_year: str = Field(min_length=1, max_length=7)
     created_at: datetime
+
+# Register Route
+@app.post("/register", status_code=201)
+def register(user: UserCreate):
+    # Get use inputs (request info)
+    username = user.username
+    password = user.password
+
+    # Connect to database
+    with engine.connect() as conn:
+        # Verify if username already exists
+        query = conn.execute(text("SELECT * FROM users WHERE username = :username"), {"username": username})
+        existing_username = query.fetchone()
+
+        # If it exists, return 400
+        if existing_username is not None:
+            raise HTTPException(status_code=400, detail="Username is already in use.")
+
+        # Else, hash password..
+        hashed_pass = hash_password(password)
+
+        # ..and add to database
+        conn.execute(text("INSERT INTO users (username, password) VALUES (:username, :password)"), {"username": username, "password": hashed_pass})
+        conn.commit()
+
+        # Get id from the recently added user
+        query = conn.execute(text("SELECT username FROM users WHERE id = LAST_INSERT_ID()"))
+        results = query.fetchone()
+
+        # Reorganize the new dict with new user's username, and return it
+        new_dict = {
+            "username": results["username"],
+            "message": "User created successfully."
+        }
+        return new_dict
