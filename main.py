@@ -150,3 +150,36 @@ def register(user: UserCreate):
             "message": "User created successfully."
         }
         return new_dict
+    
+@app.post("/login", status_code=200)
+def login(user: UserCreate):
+    # Get user inputs (request info)
+    username = user.username
+    password = user.password
+
+    # Connect to database
+    with engine.connect() as conn:
+        # Check if user is already registered
+        query = conn.execute(text("SELECT * FROM users WHERE username = :username"), {"username": username})
+        existing_user = query.fetchone()
+
+        # If not, return 401
+        if existing_user is None:
+            raise HTTPException(status_code=401, detail="User not found or doesn't exist.")
+        
+        # Convert row to dict
+        cur_user = dict(existing_user._mapping)
+
+        # Check if the password inputted match the password stored
+        verify_pass = verify_password(password, cur_user['password'])
+
+        # If it doesn't, return 401
+        if not verify_pass:
+            raise HTTPException(status_code=401, detail="Wrong password. Try Again.")
+        
+        # If it does, create a JWT for user access
+        token = create_jwt_token(cur_user['id'])
+
+        # Return token to the user
+        return {"access_token": token, "token_type": "bearer"}
+        
