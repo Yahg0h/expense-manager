@@ -27,6 +27,46 @@ ALGORITHM = "HS256"
 # Engine will allow to CRUD info to and from the MySQL database with SQLAlchemy instead of mysql.connector
 engine = create_engine(f"mysql+pymysql://{db_user}:{db_password}@{db_host}/{db_name}")
 
+# JWT Creation
+def create_jwt_token(user_id: int):
+    payload = {
+        "user_id": user_id,
+        "exp": datetime.now(timezone.utc) + timedelta(hours=1)
+    }
+    token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    return token
+
+# JWT Validation
+def verify_jwt_token(token: str):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("user_id")
+        return user_id
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
+    
+# JWT Verification (for access in restricted areas)
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
+    user_id = verify_jwt_token(token)
+
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Invalid token.")
+    
+    return user_id
+
+# Password hasher
+def hash_password(password: str):
+    hashed_pass = pwd_context.hash(password)
+    return hashed_pass
+
+# Password verifier
+def verify_password(password: str, hashed_password: str):
+    pass_check = pwd_context.verify(password, hashed_password)
+    return pass_check # Will return true to equality, and false to unequality
+
 # classes/Pydantic Models to use in the routes
 class UserCreate(BaseModel):
     username: str = Field(min_length=4, max_length=50)
