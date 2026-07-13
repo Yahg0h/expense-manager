@@ -182,4 +182,77 @@ def login(user: UserCreate):
 
         # Return token to the user
         return {"access_token": token, "token_type": "bearer"}
+    
+@app.post("/categories", status_code=201)
+def create_category(category: CategoryCreate, user_id: int = Depends(verify_token)):
+    # Get user inputs (request info)
+    name = category.name
+    description = category.description
+
+    # Connect to database
+    with engine.connect() as conn:
+        # Check if a category of the same name already exists
+        query = conn.execute(text("SELECT * FROM categories WHERE user_id = :user_id AND name = :name"), {"user_id": user_id, "name": name})
+        existing_category = query.fetchone()
+
+        # If it already exists, return 401
+        if existing_category is not None:
+            raise HTTPException(status_code=401, detail="A category with the same name already exists.")
         
+        # Else, add it to the database
+        conn.execute(text("INSERT INTO categories (name, description, user_id) VALUES (:name, :description, :user_id)"), {"name": name, "description": description, "user_id": user_id})
+        conn.commit()
+
+        # Get the recently added category
+        query = conn.execute(text("SELECT * FROM categories WHERE id = LAST_INSERT_ID()"))
+        results = query.fetchone()
+
+        # Convert from row to dict
+        recent_category = dict(results._mapping)
+
+        # Create a new dict to organize the info
+        new_dict = {
+            "id": recent_category['id'],
+            "name": recent_category['name'],
+            "description": recent_category['description'],
+            "user_id": user_id,
+            "created_at": recent_category['created_at']
+        }
+
+        # Return the response in the correct Pydantic model
+        response = CategoryResponse(**new_dict) # Add the dict info to a Pydantic model
+        return response # Returns the model
+    
+@app.get("/categories", status_code=200)
+def get_category(user_id: int = Depends(verify_token)):
+    # Connect to database
+    with engine.connect() as conn:
+        # Get all categories registered by the user
+        query = conn.execute(text("SELECT * FROM categories WHERE user_id = :user_id"), {"user_id": user_id})
+        results = query.fetchall()
+
+        # If there isn't a category created, return a custom message
+        if not results:
+            return {"message": "You haven't created any categories yet."}
+        
+        # Else, create a list to keep all the categories created by the user
+        registered_categories = []
+
+        # For each registered category
+        for category_row in results:
+            # Convert from row to dict
+            results_dict = dict(category_row._mapping)
+
+            # Put all category info in a new dict
+            category_dict = {
+                "id": results_dict['id'],
+                "name": results_dict['name'],
+                "description": results_dict['description'],
+                "user_id": user_id,
+                "created_at": results_dict['created_at']
+            }
+            # Add the category info dict to a Pydantic model, then to the category list
+            registered_categories.append(CategoryResponse(**category_dict))
+
+        # Return the list of registered categories by the user
+        return registered_categories
