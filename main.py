@@ -152,9 +152,9 @@ def register(user: UserCreate):
         query = conn.execute(text("SELECT username FROM users WHERE id = LAST_INSERT_ID()"))
         results = query.fetchone()
 
-        # Reorganize the new dict with new user's username, and return it
+        # Reorganize the new dict with new user's username (it's in a row, since its just one information (e.g "0")), and return it
         new_dict = {
-            "username": results["username"],
+            "username": results[0],
             "message": "User created successfully."
         }
         return new_dict
@@ -276,7 +276,7 @@ def create_expenses(expenses: ExpensesCreate, user_id: int = Depends(verify_toke
     # Connect to database
     with engine.connect() as conn:
         # Check if the category chosen exists
-        query = conn.execute(text("SELECT * FROM categories WHERE id = :category_id"), {"id": category_id})
+        query = conn.execute(text("SELECT * FROM categories WHERE id = :category_id"), {"category_id": category_id})
         results = query.fetchone()
 
         # If it doesn't, return error 404
@@ -366,7 +366,7 @@ def monthly_report(month: str, user_id: int = Depends(verify_token)):
 
         # If there isn't any data to report, return custom message
         if not results:
-            return {"message": "No data recorded. Data analysis is not possible."}
+            return {"message": "No data recorded for the month. Data analysis is not possible."}
     
         # Convert row data to DataFrame
         df = pd.DataFrame([dict(row._mapping) for row in results])
@@ -420,7 +420,7 @@ def category_report(category_id: int, user_id: int = Depends(verify_token)):
 
         # If there isn't any data to report, return custom message
         if not results:
-            return {"message": "No data recorded. Data analysis is not possible."}
+            return {"message": "No data recorded for the category. Data analysis is not possible."}
         
         # Convert row data to DataFrame
         df = pd.DataFrame([dict(row._mapping) for row in results])
@@ -470,7 +470,7 @@ def comparison_report(month: str, user_id: int = Depends(verify_token)):
 
         # If there isn't any data to report, return custom message
         if not current_results:
-            return {"message": "No data recorded. Data analysis is not possible."}
+            return {"message": "No data recorded for the current month. Data analysis is not possible."}
     
         # Convert row data to DataFrame
         df = pd.DataFrame([dict(row._mapping) for row in current_results])
@@ -502,7 +502,7 @@ def comparison_report(month: str, user_id: int = Depends(verify_token)):
 
         # If there isn't any data to report, return custom message
         if not previous_results:
-            return {"message": "No data recorded. Data analysis is not possible."}
+            return {"message": "No data recorded for the previous month. Data analysis is not possible."}
     
         # Convert row data to DataFrame
         df = pd.DataFrame([dict(row._mapping) for row in previous_results])
