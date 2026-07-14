@@ -68,6 +68,13 @@ def verify_password(password: str, hashed_password: str):
     pass_check = pwd_context.verify(password, hashed_password)
     return pass_check # Will return true to equality, and false to unequality
 
+# Get previous month function - for use in expense comparison report in "/report/comparison/{month}"
+def get_previous_month(month_str):
+    # e.g '2026-07' returns '2026-06'
+    date_obj = datetime.strptime(f"{month_str}-01", "%Y-%m-%d")
+    previous_date = date_obj - timedelta(days=1)
+    return previous_date.strftime("%Y-%m")
+
 # classes/Pydantic Models to use in the routes
 class UserCreate(BaseModel):
     username: str = Field(min_length=4, max_length=50)
@@ -447,4 +454,91 @@ def category_report(category_id: int, user_id: int = Depends(verify_token)):
 
         # Return the report to be displayed to the user
         return report
+    
+@app.get("/report/comparison/{month}")
+def comparison_report(month: str, user_id: int = Depends(verify_token)):
+    # Get the current month, and the previous month to compare
+    current_month = month
+    previous_month = get_previous_month(month)
 
+    # Connect to database
+    with engine.connect() as conn:
+        # Get all total spent, average per category and expense quantity for the current_month
+        query = conn.execute(text("SELECT c.name as category, SUM(e.amount) as total, COUNT(e.id) as count FROM expenses e JOIN categories c ON e.category_id = c.id WHERE e.user_id = :user_id AND DATE_FORMAT(e.expense_date, '%Y-%m') = :month GROUP BY c.id, c.name"), 
+                             {"user_id": user_id, "month": current_month})
+        current_results = query.fetchall()
+
+        # If there isn't any data to report, return custom message
+        if not current_results:
+            return {"message": "No data recorded. Data analysis is not possible."}
+    
+        # Convert row data to DataFrame
+        df = pd.DataFrame([dict(row._mapping) for row in current_results])
+
+        # Create a report dict with all info regarding the expenses in a month time-frame
+        current_report = {
+            "month": month,
+            "total_spent": float(df['total'].sum()),
+            "average_per_category": float(df['total'].mean()),
+            "top_category": {
+                "name": df.loc[df['total'].idxmax()]['category'],
+                "amount": float(df.loc[df['total'].idxmax()]['total'])
+            },
+            "by_category": [
+                {
+                    "category": row['category'],
+                    "total": float(row['total']),
+                    "count": int(row['count'])
+                }
+                for _, row in df.iterrows()
+            ],
+            "count": len(df)
+        }
+
+        # Get all total spent, average per category and expense quantity for the previous_month
+        query = conn.execute(text("SELECT c.name as category, SUM(e.amount) as total, COUNT(e.id) as count FROM expenses e JOIN categories c ON e.category_id = c.id WHERE e.user_id = :user_id AND DATE_FORMAT(e.expense_date, '%Y-%m') = :month GROUP BY c.id, c.name"), 
+                             {"user_id": user_id, "month": previous_month})
+        previous_results = query.fetchall()
+
+        # If there isn't any data to report, return custom message
+        if not previous_results:
+            return {"message": "No data recorded. Data analysis is not possible."}
+    
+        # Convert row data to DataFrame
+        df = pd.DataFrame([dict(row._mapping) for row in previous_results])
+
+        # Create a report dict with all info regarding the expenses in a month time-frame
+        previous_report = {
+            "month": month,
+            "total_spent": float(df['total'].sum()),
+            "average_per_category": float(df['total'].mean()),
+            "top_category": {
+                "name": df.loc[df['total'].idxmax()]['category'],
+                "amount": float(df.loc[df['total'].idxmax()]['total'])
+            },
+            "by_category": [
+                {
+                    "category": row['category'],
+                    "total": float(row['total']),
+                    "count": int(row['count'])
+                }
+                for _, row in df.iterrows()
+            ],
+            "count": len(df)
+        }
+
+        # Difference calculations between the two reports
+        difference = current_report['total_spent'] - previous_report['total_spent']
+        percentage_change = (difference / previous_report['total_spent']) * 100
+
+        # Comparison dict between the current month and the previous month
+        comparison = {
+            "current_month": current_month,
+            "previous_month": previous_month,
+            "current_report": current_report,
+            "previous_report": previous_report,
+            "difference": difference,
+            "percentage_change": percentage_change
+        }
+
+        return comparison
