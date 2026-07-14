@@ -265,6 +265,79 @@ def get_category(user_id: int = Depends(verify_token)):
         # Return the list of registered categories by the user
         return registered_categories
     
+@app.delete("/categories/{category_id}", status_code=200)
+def delete_category(category_id: int, user_id: int = Depends(verify_token)):
+    # Connect to database
+    with engine.connect() as conn:
+        # Search for the category
+        query = conn.execute(text("SELECT * FROM categories WHERE id = :category_id"), {"category_id": category_id})
+        results = query.fetchone()
+
+        # Check if the category doesn't exist
+        if not results:
+            raise HTTPException(status_code=404, detail="Category not found or doesn't exist.") 
+
+        # If it does, convert from row to dict
+        results_dict = dict(results._mapping)
+
+        # Check if the current user is the owner of the category, If not, return 403
+        if results_dict['user_id'] != user_id:
+            raise HTTPException(status_code=403, detail="Access forbidden: You don't have access to do this action.")
+        
+        # Else, delete the category
+        conn.execute(text("DELETE FROM categories WHERE id = :category_id AND user_id = :user_id"), {"category_id": category_id, "user_id": user_id})
+        conn.commit()
+        
+        return {"message": "Category deleted successfully."}
+    
+@app.put("/categories/{category_id}")
+def update_category(category: CategoryCreate, category_id: int, user_id: int = Depends(verify_token)):
+    # Get user inputs to update the category info (request info)
+    name = category.name
+    description = category.description
+
+    # Connect to database
+    with engine.connect() as conn:
+        # Search for category
+        query = conn.execute(text("SELECT * FROM categories WHERE id = :category_id"), {"category_id": category_id})
+        results = query.fetchone()
+
+        # Check if the category doesn't exist
+        if not results:
+            raise HTTPException(status_code=404, detail="Category not found or doesn't exist.") 
+
+        # If it does, convert from row to dict
+        results_dict = dict(results._mapping)
+
+        # Check if the current user is the owner of the category, If not, return 403
+        if results_dict['user_id'] != user_id:
+            raise HTTPException(status_code=403, detail="Access forbidden: You don't have access to do this action.")
+        
+        # Else, update the category info
+        conn.execute(text("UPDATE categories SET name = :name, description = :description WHERE id = :category_id AND user_id = :user_id"), 
+                     {"name": name, "description": description, "category_id": category_id, "user_id": user_id})
+        conn.commit()
+
+        # Get the data of recently updated category
+        query = conn.execute(text("SELECT * FROM categories WHERE id = :category_id"), {"category_id": category_id})
+        results = query.fetchone()
+
+        # Convert from row to dict
+        updated_category = dict(results._mapping)
+
+        # Create a new dict to organize the info
+        new_dict = {
+            "id": updated_category['id'],
+            "name": updated_category['name'],
+            "description": updated_category['description'],
+            "user_id": user_id,
+            "created_at": updated_category['created_at']
+        }
+
+        # Return the response in the correct Pydantic model
+        response = CategoryResponse(**new_dict) # Add the dict info to a Pydantic model
+        return response # Returns the model
+
 @app.post("/expenses", status_code=201)
 def create_expenses(expenses: ExpensesCreate, user_id: int = Depends(verify_token)):
     # Get user input (request info)
