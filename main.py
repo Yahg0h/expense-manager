@@ -1,6 +1,7 @@
 import os
 import jwt
 import requests
+import pandas as pd
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from fastapi import FastAPI, HTTPException, Depends
@@ -343,6 +344,44 @@ def get_expenses(user_id: int = Depends(verify_token)):
             }
             # Add the expense dict info into the list
             registered_expenses.append(ExpensesResponse(**expense_dict))
-            
+
         # Return the full expenses list
         return registered_expenses
+    
+@app.get("/report/month/{month}")
+def monthly_report(month: str, user_id: int = Depends(verify_token)):
+    # Connect to db
+    with engine.connect() as conn:
+        # Get category, total spent and expense quantity from all expenses registered by the user
+        query = conn.execute(text("SELECT c.name as category, SUM(e.amount) as total, COUNT(e.id) as count FROM expenses e JOIN categories c ON e.category_id = c.id WHERE e.user_id = :user_id AND DATE_FORMAT(e.expense_date, '%Y-%m') = :month GROUP BY c.id, c.name"), 
+                             {"user_id": user_id, "month": month})
+        results = query.fetchall()
+
+        # If there isn't any data to report, return custom message
+        if not results:
+            return {"message": "No data recorded. Data analysis is not possible."}
+    
+        # Convert row data to DataFrame
+        df = pd.DataFrame([dict(row._mapping) for row in results])
+
+        # Create a report dict with all info regarding the expenses in a month time-frame
+        report = {
+            "month": month,
+            "total_spent": float(df['total'].sum()),
+            "average_per_category": float(df['total'].mean()),
+            "top_category": {
+                "name": df.loc[df['total'].idxmax()]['category'],
+                "amount": float(df.loc[df['total'].idxmax()]['total'])
+            },
+            "by_category": [
+                {
+                    "category": row['category'],
+                    "total": float(row['total']),
+                    "count": int(row['count'])
+                }
+                for _, row in df.iterrows()
+            ]
+        }
+
+        # Return the report to be displayed to the user
+        return report
