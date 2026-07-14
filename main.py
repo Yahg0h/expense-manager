@@ -385,3 +385,66 @@ def monthly_report(month: str, user_id: int = Depends(verify_token)):
 
         # Return the report to be displayed to the user
         return report
+    
+@app.get("/report/category/{category_id}")
+def category_report(category_id: int, user_id: int = Depends(verify_token)):
+    # Connect to database
+    with engine.connect() as conn:
+        # Check if the category to be analyzed was created by the user
+        query = conn.execute(text("SELECT * FROM categories WHERE id = :category_id AND user_id = :user_id"), {"category_id": category_id, "user_id": user_id})
+        category = query.fetchone()
+
+        # If it exist doesn't, return error 404
+        if category is None:
+            raise HTTPException(status_code=404, detail="Category not found or doesn't exist.")
+        
+        # Else, convert from row to dict
+        existing_category = dict(category._mapping)
+
+        # Check if the category was created by the current user trying to use it
+        # If the category wasn't created by the current user, return 403
+        if existing_category['user_id'] != user_id:
+            raise HTTPException(status_code=403, detail="Access Forbidden: You aren't allowed to use this category.")
+        
+        # Get all expenses made under the category of id 'category_id'
+        query = conn.execute(text("SELECT e.amount, e.expense_date FROM expenses e JOIN categories c ON e.category_id = c.id WHERE e.user_id = :user_id AND e.category_id = :category_id"), 
+                             {"user_id": user_id, "category_id": category_id})
+        results = query.fetchall()
+
+        # If there isn't any data to report, return custom message
+        if not results:
+            return {"message": "No data recorded. Data analysis is not possible."}
+        
+        # Convert row data to DataFrame
+        df = pd.DataFrame([dict(row._mapping) for row in results])
+
+        # Pandas calculations (do one by one so it can be easy to track, unlike before)
+        # Total spent
+        total = df['amount'].sum()
+
+        # Biggest expense
+        max_expense = df['amount'].max()
+
+        # Lowest expense
+        min_expense = df['amount'].min()
+
+        # Average per expense
+        average = df['amount'].mean()
+
+        # Expense count
+        count = len(df)
+
+        # Create a report dict with all info regarding the expenses in a category
+        report = {
+            "category_id": category_id,
+            "category_name": existing_category['name'],
+            "total_spent": float(total),
+            "max_expense": float(max_expense),
+            "min_expense": float(min_expense),
+            "average_per_expense": float(average),
+            "expense_count": count
+        }
+
+        # Return the report to be displayed to the user
+        return report
+
