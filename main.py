@@ -1,6 +1,5 @@
 import os
 import jwt
-import requests
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -158,7 +157,8 @@ def register(user: UserCreate):
             "message": "User created successfully."
         }
         return new_dict
-    
+
+# Login route
 @app.post("/login", status_code=200)
 def login(user: UserCreate):
     # Get user inputs (request info)
@@ -190,7 +190,8 @@ def login(user: UserCreate):
 
         # Return token to the user
         return {"access_token": token, "token_type": "bearer"}
-    
+
+# CREATE category
 @app.post("/categories", status_code=201)
 def create_category(category: CategoryCreate, user_id: int = Depends(verify_token)):
     # Get user inputs (request info)
@@ -230,7 +231,8 @@ def create_category(category: CategoryCreate, user_id: int = Depends(verify_toke
         # Return the response in the correct Pydantic model
         response = CategoryResponse(**new_dict) # Add the dict info to a Pydantic model
         return response # Returns the model
-    
+
+# READ category information   
 @app.get("/categories", status_code=200)
 def get_category(user_id: int = Depends(verify_token)):
     # Connect to database
@@ -264,33 +266,9 @@ def get_category(user_id: int = Depends(verify_token)):
 
         # Return the list of registered categories by the user
         return registered_categories
-    
-@app.delete("/categories/{category_id}", status_code=200)
-def delete_category(category_id: int, user_id: int = Depends(verify_token)):
-    # Connect to database
-    with engine.connect() as conn:
-        # Search for the category
-        query = conn.execute(text("SELECT * FROM categories WHERE id = :category_id"), {"category_id": category_id})
-        results = query.fetchone()
 
-        # Check if the category doesn't exist
-        if not results:
-            raise HTTPException(status_code=404, detail="Category not found or doesn't exist.") 
-
-        # If it does, convert from row to dict
-        results_dict = dict(results._mapping)
-
-        # Check if the current user is the owner of the category, If not, return 403
-        if results_dict['user_id'] != user_id:
-            raise HTTPException(status_code=403, detail="Access forbidden: You don't have access to do this action.")
-        
-        # Else, delete the category
-        conn.execute(text("DELETE FROM categories WHERE id = :category_id AND user_id = :user_id"), {"category_id": category_id, "user_id": user_id})
-        conn.commit()
-        
-        return {"message": "Category deleted successfully."}
-    
-@app.put("/categories/{category_id}")
+# UPDATE category information
+@app.put("/categories/{category_id}", status_code=200)
 def update_category(category: CategoryCreate, category_id: int, user_id: int = Depends(verify_token)):
     # Get user inputs to update the category info (request info)
     name = category.name
@@ -338,6 +316,33 @@ def update_category(category: CategoryCreate, category_id: int, user_id: int = D
         response = CategoryResponse(**new_dict) # Add the dict info to a Pydantic model
         return response # Returns the model
 
+# DELETE category
+@app.delete("/categories/{category_id}", status_code=200)
+def delete_category(category_id: int, user_id: int = Depends(verify_token)):
+    # Connect to database
+    with engine.connect() as conn:
+        # Search for the category
+        query = conn.execute(text("SELECT * FROM categories WHERE id = :category_id"), {"category_id": category_id})
+        results = query.fetchone()
+
+        # Check if the category doesn't exist
+        if not results:
+            raise HTTPException(status_code=404, detail="Category not found or doesn't exist.") 
+
+        # If it does, convert from row to dict
+        results_dict = dict(results._mapping)
+
+        # Check if the current user is the owner of the category, If not, return 403
+        if results_dict['user_id'] != user_id:
+            raise HTTPException(status_code=403, detail="Access forbidden: You don't have access to do this action.")
+        
+        # Else, delete the category
+        conn.execute(text("DELETE FROM categories WHERE id = :category_id AND user_id = :user_id"), {"category_id": category_id, "user_id": user_id})
+        conn.commit()
+        
+        return {"message": "Category deleted successfully."}
+
+# CREATE expenses
 @app.post("/expenses", status_code=201)
 def create_expenses(expenses: ExpensesCreate, user_id: int = Depends(verify_token)):
     # Get user input (request info)
@@ -391,7 +396,8 @@ def create_expenses(expenses: ExpensesCreate, user_id: int = Depends(verify_toke
 
         # Return the Pydantic model with all expenses info
         return response
-    
+
+# READ expenses information
 @app.get("/expenses", status_code=200)
 def get_expenses(user_id: int = Depends(verify_token)):
     # Connect to database
@@ -427,7 +433,102 @@ def get_expenses(user_id: int = Depends(verify_token)):
 
         # Return the full expenses list
         return registered_expenses
-    
+
+# UPDATE expense information
+@app.put("/expenses/{expense_id}", status_code=200)
+def update_expense(expenses: ExpensesCreate, expense_id: int, user_id: int = Depends(verify_token)):
+    # Get user inputs to update the expense
+    category_id = expenses.category_id
+    description = expenses.description
+    amount = expenses.amount
+    expense_date = expenses.expense_date
+
+    # Connect to database
+    with engine.connect() as conn:
+        # Search for the expense to be updated
+        query = conn.execute(text("SELECT * FROM expenses WHERE id = :expense_id"), {"expense_id": expense_id})
+        existing_expense = query.fetchone()
+
+        # Check if the expense doesn't exist
+        if not existing_expense:
+            raise HTTPException(status_code=404, detail="Expense not found or doesn't exist.") 
+
+        # If it does, convert from row to dict
+        results_dict = dict(existing_expense._mapping)
+
+        # Check if the current user is the owner of the expense, If not, return 403
+        if results_dict['user_id'] != user_id:
+            raise HTTPException(status_code=403, detail="Access forbidden: You don't have access to do this action.")
+        
+        # Check if the category registered in the expense exists
+        query = conn.execute(text("SELECT * FROM categories WHERE id = :category_id"), {"category_id": category_id})
+        existing_category = query.fetchone()
+
+        # If it doesn't, return 404
+        if existing_category is None:
+            raise HTTPException(status_code=404, detail="Category not found or doesn't exist.")
+        
+        # Convert from row to dict
+        category_dict = dict(existing_category._mapping)
+
+        # Check if the current user is the creator of the category, If not, return 403
+        if category_dict['user_id'] != user_id:
+            raise HTTPException(status_code=403, detail="Access forbidden: You don't have access to do this action.")
+
+        # Else, update the expense info
+        conn.execute(text("UPDATE expenses SET category_id = :category_id, description = :description, amount = :amount, expense_date = :expense_date WHERE id = :expense_id AND user_id = :user_id"), 
+                     {"category_id": category_id, "description": description, "amount": amount, "expense_date": expense_date, "expense_id": expense_id, "user_id": user_id})
+        conn.commit()        
+
+        # Get the data of recently updated expense
+        query = conn.execute(text("SELECT * FROM expenses WHERE id = :expense_id"), {"expense_id": expense_id})
+        results = query.fetchone()
+
+        # Convert from row to dict
+        updated_expense = dict(results._mapping)
+
+        # Create a new dict to organize the info
+        new_dict = {
+            "id": updated_expense['id'],
+            "user_id": user_id,
+            "category_id": updated_expense['category_id'],
+            "description": updated_expense['description'],
+            "amount": updated_expense['amount'],
+            "expense_date": updated_expense['expense_date'],
+            "created_at": updated_expense['created_at']
+        }
+
+        # Return the response in the correct Pydantic model
+        response = ExpensesResponse(**new_dict) # Add the dict info to a Pydantic model
+        return response # Returns the model
+
+# DELETE expense
+@app.delete("/expenses/{expense_id}", status_code=200)
+def delete_expense(expense_id: int, user_id: int = Depends(verify_token)):
+    # Connect to database
+    with engine.connect() as conn:
+        # Search the database for the expense
+        query = conn.execute(text("SELECT * FROM expenses WHERE id = :expense_id"), {"expense_id": expense_id})
+        results = query.fetchone()
+
+        # Check if the expense doesn't exist
+        if not results:
+            raise HTTPException(status_code=404, detail="Expense not found or doesn't exist.") 
+
+        # If it does, convert from row to dict
+        results_dict = dict(results._mapping)
+
+        # Check if the current user is the owner of the expense, If not, return 403
+        if results_dict['user_id'] != user_id:
+            raise HTTPException(status_code=403, detail="Access forbidden: You don't have access to do this action.")
+        
+        # Else, delete the category
+        conn.execute(text("DELETE FROM expenses WHERE id = :expense_id AND user_id = :user_id"), {"expense_id": expense_id, "user_id": user_id})
+        conn.commit()
+        
+        return {"message": "Expense deleted successfully."}
+
+# Monthly report
 @app.get("/report/month/{month}")
 def monthly_report(month: str, user_id: int = Depends(verify_token)):
     # Connect to db
@@ -465,7 +566,8 @@ def monthly_report(month: str, user_id: int = Depends(verify_token)):
 
         # Return the report to be displayed to the user
         return report
-    
+
+# Category report
 @app.get("/report/category/{category_id}")
 def category_report(category_id: int, user_id: int = Depends(verify_token)):
     # Connect to database
@@ -527,7 +629,8 @@ def category_report(category_id: int, user_id: int = Depends(verify_token)):
 
         # Return the report to be displayed to the user
         return report
-    
+
+# Monthly comparison report   
 @app.get("/report/comparison/{month}")
 def comparison_report(month: str, user_id: int = Depends(verify_token)):
     # Get the current month, and the previous month to compare
