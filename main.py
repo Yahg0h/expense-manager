@@ -256,3 +256,93 @@ def get_category(user_id: int = Depends(verify_token)):
 
         # Return the list of registered categories by the user
         return registered_categories
+    
+@app.post("/expenses", status_code=201)
+def create_expenses(expenses: ExpensesCreate, user_id: int = Depends(verify_token)):
+    # Get user input (request info)
+    category_id = expenses.category_id
+    description = expenses.description
+    amount = expenses.amount
+    expense_date = expenses.expense_date
+
+    # Connect to database
+    with engine.connect() as conn:
+        # Check if the category chosen exists
+        query = conn.execute(text("SELECT * FROM categories WHERE id = :category_id"), {"id": category_id})
+        results = query.fetchone()
+
+        # If it doesn't, return error 404
+        if results is None:
+            raise HTTPException(status_code=404, detail="Category not found or doesn't exist.")
+        
+        # Else, convert from row to dict
+        existing_category = dict(results._mapping)
+
+        # Check if the category was created by the current user trying to use it
+        # If the category wasn't created by the current user, return 403
+        if existing_category['user_id'] != user_id:
+            raise HTTPException(status_code=403, detail="Access Forbidden: You aren't allowed to use this category.")
+        
+        # Else, add it to the database
+        conn.execute(text("INSERT INTO expenses (user_id, category_id, description, amount, expense_date) VALUES (:user_id, :category_id, :description, :amount, :expense_date)"), 
+                     {"user_id": user_id, "category_id": category_id, "description": description, "amount": amount, "expense_date": expense_date})
+        conn.commit()
+
+        # Get the recently created expense
+        query = conn.execute(text("SELECT * FROM expenses WHERE id = LAST_INSERT_ID()"))
+        results = query.fetchone()
+
+        # Convert from row to dict
+        results_dict = dict(results._mapping)
+
+        # Reorganize a new dict with all expense information
+        expenses_dict = {
+            "id": results_dict['id'],
+            "user_id": user_id,
+            "category_id": results_dict['category_id'],
+            "description": results_dict['description'],
+            "amount": results_dict['amount'],
+            "expense_date": results_dict['expense_date'],
+            "created_at": results_dict['created_at']
+        }
+        # Add dict to the Pydantic model
+        response = ExpensesResponse(**expenses_dict)
+
+        # Return the Pydantic model with all expenses info
+        return response
+    
+@app.get("/expenses", status_code=200)
+def get_expenses(user_id: int = Depends(verify_token)):
+    # Connect to database
+    with engine.connect() as conn:
+        # Get all expenses registered by the user
+        query = conn.execute(text("SELECT * FROM expenses WHERE user_id = :user_id"), {"user_id": user_id})
+        results = query.fetchall()
+
+        # If the user doesn't have any expenses registered, return custom message
+        if not results:
+            return {"message": "You haven't registered any expenses yet."}
+        
+        # Else if it does, create a list to keep track of all of the expenses registered
+        registered_expenses = []
+
+        # For each expense registered
+        for expense_row in results:
+            # Convert from row to dict
+            results_dict = dict(expense_row._mapping)
+
+            # Put all expense info in a new dict
+            expense_dict = {
+                "id": results_dict['id'],
+                "user_id": user_id,
+                "category_id": results_dict['category_id'],
+                "description": results_dict['description'],
+                "amount": results_dict['amount'],
+                "expense_date": results_dict['expense_date'],
+                "created_at": results_dict['created_at']
+            }
+            # Add the expense dict info into the list
+            registered_expenses.append(ExpensesResponse(**expense_dict))
+            
+        # Return the full expenses list
+        return registered_expenses
