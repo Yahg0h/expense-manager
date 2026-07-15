@@ -336,7 +336,7 @@ This project is licensed under the MIT License — see the LICENSE file for deta
  
 ## Author
  
-**Yahg0h** — Backend Developer
+Made by **Yahg0h**. I hope you like it!
 - GitHub: [@yahg0h](https://github.com/yahg0h)
 - Docker Hub: [yahg0h](https://hub.docker.com/u/yahg0h)
 ---
