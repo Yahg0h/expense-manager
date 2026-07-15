@@ -5,6 +5,7 @@ pymysql
 python-dotenv
 PyJWT
 argon2-cffi
+passlib
 pandas
 pytest
 httpx

@@ -430,7 +430,7 @@ def test_access_others_expense(user_token, expenses):
     })
     other_token = response.json()["access_token"]
     
-    # Try to access first user's expense
+    # Try to access first user's expense (should return 403 Forbidden)
     headers = {"Authorization": f"Bearer {other_token}"}
     response = client.delete(f"/expenses/{expenses[0]}", headers=headers)
     assert response.status_code == 403

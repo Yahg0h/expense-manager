@@ -35,7 +35,7 @@ The project demonstrates production-ready backend development practices includin
 | ORM/Query | SQLAlchemy Core + `text()` |
 | Validation | Pydantic v2 |
 | Authentication | PyJWT (HS256) |
-| Password Hashing | Argon2 (argon2-cffi) |
+| Password Hashing | Passlib + Argon2 (argon2-cffi) |
 | Data Analysis | pandas |
 | Testing | pytest + httpx |
 | Server | Uvicorn (ASGI) |
@@ -119,10 +119,10 @@ The project requires the following Python packages:
 - FastAPI (web framework)
 - SQLAlchemy (database queries)
 - PyJWT (authentication)
-- Argon2 (password hashing)
+- Argon2 + Passlib (password hashing)
 - pandas (data analysis)
 - pytest (testing)
-- MySQL connector (database driver)
+- PyMySQL (database driver)
 - python-dotenv (environment variables)
 
 See `requirements.txt` for all dependencies with specific versions.
