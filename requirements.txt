@@ -1,14 +1,10 @@
 fastapi
 uvicorn
 sqlalchemy
-passlib
 pymysql
-pydantic-settings
 python-dotenv
 PyJWT
 argon2-cffi
-requests
 pandas
 pytest
 httpx
-jinja2

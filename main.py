@@ -10,6 +10,8 @@ from passlib.context import CryptContext
 from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
 
+from swagger_schemas import ROUTE_DOCS
+
 # Configure application
 app = FastAPI()
 security = HTTPBearer()
@@ -124,7 +126,7 @@ class BudgetResponse(BaseModel):
     created_at: datetime
 
 # Register Route
-@app.post("/register", status_code=201)
+@app.post("/register", status_code=201, **ROUTE_DOCS["register"])
 def register(user: UserCreate):
     # Get use inputs (request info)
     username = user.username
@@ -159,7 +161,7 @@ def register(user: UserCreate):
         return new_dict
 
 # Login route
-@app.post("/login", status_code=200)
+@app.post("/login", status_code=200, **ROUTE_DOCS["login"])
 def login(user: UserCreate):
     # Get user inputs (request info)
     username = user.username
@@ -192,7 +194,7 @@ def login(user: UserCreate):
         return {"access_token": token, "token_type": "bearer"}
 
 # CREATE category
-@app.post("/categories", status_code=201)
+@app.post("/categories", status_code=201, **ROUTE_DOCS["create_category"])
 def create_category(category: CategoryCreate, user_id: int = Depends(verify_token)):
     # Get user inputs (request info)
     name = category.name
@@ -233,7 +235,7 @@ def create_category(category: CategoryCreate, user_id: int = Depends(verify_toke
         return response # Returns the model
 
 # READ category information   
-@app.get("/categories", status_code=200)
+@app.get("/categories", status_code=200, **ROUTE_DOCS["get_categories"])
 def get_category(user_id: int = Depends(verify_token)):
     # Connect to database
     with engine.connect() as conn:
@@ -268,7 +270,7 @@ def get_category(user_id: int = Depends(verify_token)):
         return registered_categories
 
 # UPDATE category information
-@app.put("/categories/{category_id}", status_code=200)
+@app.put("/categories/{category_id}", status_code=200, **ROUTE_DOCS["update_category"])
 def update_category(category: CategoryCreate, category_id: int, user_id: int = Depends(verify_token)):
     # Get user inputs to update the category info (request info)
     name = category.name
@@ -317,7 +319,7 @@ def update_category(category: CategoryCreate, category_id: int, user_id: int = D
         return response # Returns the model
 
 # DELETE category
-@app.delete("/categories/{category_id}", status_code=200)
+@app.delete("/categories/{category_id}", status_code=200, **ROUTE_DOCS["delete_category"])
 def delete_category(category_id: int, user_id: int = Depends(verify_token)):
     # Connect to database
     with engine.connect() as conn:
@@ -343,7 +345,7 @@ def delete_category(category_id: int, user_id: int = Depends(verify_token)):
         return {"message": "Category deleted successfully."}
 
 # CREATE expenses
-@app.post("/expenses", status_code=201)
+@app.post("/expenses", status_code=201, **ROUTE_DOCS["create_expense"])
 def create_expenses(expenses: ExpensesCreate, user_id: int = Depends(verify_token)):
     # Get user input (request info)
     category_id = expenses.category_id
@@ -398,7 +400,7 @@ def create_expenses(expenses: ExpensesCreate, user_id: int = Depends(verify_toke
         return response
 
 # READ expenses information
-@app.get("/expenses", status_code=200)
+@app.get("/expenses", status_code=200, **ROUTE_DOCS["get_expenses"])
 def get_expenses(user_id: int = Depends(verify_token)):
     # Connect to database
     with engine.connect() as conn:
@@ -435,7 +437,7 @@ def get_expenses(user_id: int = Depends(verify_token)):
         return registered_expenses
 
 # UPDATE expense information
-@app.put("/expenses/{expense_id}", status_code=200)
+@app.put("/expenses/{expense_id}", status_code=200, **ROUTE_DOCS["update_expense"])
 def update_expense(expenses: ExpensesCreate, expense_id: int, user_id: int = Depends(verify_token)):
     # Get user inputs to update the expense
     category_id = expenses.category_id
@@ -503,7 +505,7 @@ def update_expense(expenses: ExpensesCreate, expense_id: int, user_id: int = Dep
         return response # Returns the model
 
 # DELETE expense
-@app.delete("/expenses/{expense_id}", status_code=200)
+@app.delete("/expenses/{expense_id}", status_code=200, **ROUTE_DOCS["delete_expense"])
 def delete_expense(expense_id: int, user_id: int = Depends(verify_token)):
     # Connect to database
     with engine.connect() as conn:
@@ -529,7 +531,7 @@ def delete_expense(expense_id: int, user_id: int = Depends(verify_token)):
         return {"message": "Expense deleted successfully."}
 
 # Monthly report
-@app.get("/report/month/{month}")
+@app.get("/report/month/{month}", status_code=200, **ROUTE_DOCS["monthly_report"])
 def monthly_report(month: str, user_id: int = Depends(verify_token)):
     # Connect to db
     with engine.connect() as conn:
@@ -568,7 +570,7 @@ def monthly_report(month: str, user_id: int = Depends(verify_token)):
         return report
 
 # Category report
-@app.get("/report/category/{category_id}")
+@app.get("/report/category/{category_id}", status_code=200, **ROUTE_DOCS["category_report"])
 def category_report(category_id: int, user_id: int = Depends(verify_token)):
     # Connect to database
     with engine.connect() as conn:
@@ -631,7 +633,7 @@ def category_report(category_id: int, user_id: int = Depends(verify_token)):
         return report
 
 # Monthly comparison report   
-@app.get("/report/comparison/{month}")
+@app.get("/report/comparison/{month}", status_code=200, **ROUTE_DOCS["comparison_report"])
 def comparison_report(month: str, user_id: int = Depends(verify_token)):
     # Get the current month, and the previous month to compare
     current_month = month
