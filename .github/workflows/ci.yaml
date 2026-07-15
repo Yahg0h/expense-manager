@@ -1,5 +1,5 @@
 name: CI/CD Pipeline
-
+ 
 on:
   push:
     branches:
@@ -7,44 +7,70 @@ on:
   pull_request:
     branches:
       - main
-
+ 
 jobs:
   test-and-build:
     runs-on: ubuntu-latest
-
+    
+    # MySQL service for testing
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: expenses_db
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+        ports:
+          - 3306:3306
+ 
     steps:
-      # 1. Do code checkout
+      # 1. Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
-
+ 
       # 2. Setup Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.14'
-
+ 
       # 3. Install dependencies
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
-      # 4. Run tests
+ 
+      # 4. Setup MySQL database schema
+      - name: Set up MySQL database
+        run: |
+          mysql -h 127.0.0.1 -u root -proot expenses_db < schema.sql
+ 
+      # 5. Run tests
       - name: Run tests
+        env:
+          DB_HOST: 127.0.0.1
+          DB_USER: root
+          DB_PASSWORD: root
+          DB_NAME: expenses_db
+          SECRET_KEY: test_secret_key_for_ci
         run: pytest test_main.py -v
-
-      # 5. Setup Docker Buildx (necessary for multi-plataform build)
+ 
+      # 6. Setup Docker Buildx (necessary for multi-platform build)
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-      # 6. Login to Docker Hub
+ 
+      # 7. Login to Docker Hub
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-
-      # 7. Build and push image
+ 
+      # 8. Build and push image
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
