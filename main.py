@@ -126,9 +126,9 @@ class BudgetResponse(BaseModel):
     created_at: datetime
 
 # Root route
-@app.get("/")
+@app.get("/", **ROUTE_DOCS["root"])
 def root():
-    """API root endpoint - returns metadata"""
+    # API root endpoint, returns metadata
     return {
         "name": "Expense Manager API",
         "status": "operational",
