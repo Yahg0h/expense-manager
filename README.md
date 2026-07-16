@@ -214,9 +214,31 @@ See `requirements.txt` for all dependencies with specific versions.
 ```bash
    docker compose down
 ```
- 
+
+## Continuous Integration & Deployment
+
+### GitHub Actions CI/CD Pipeline
+
+The project uses GitHub Actions to automate testing and Docker image publishing:
+
+#### What Happens on Push to Main
+
+1. **Run Tests**: All 35+ pytest tests execute with MySQL service
+2. **Build Docker Image**: Creates container image from Dockerfile
+3. **Publish to Docker Hub**: Pushes image to `your-docker-username/expense-manager:latest`
+
+   **Note:** The Docker image tag in the CI/CD pipeline shown above uses your configured `DOCKER_USERNAME` secret, examples:
+   - Original repo (`yahg0h`): Publishes to `yahg0h/expense-manager:latest`
+   - Your fork: Publishes to `your-docker-username/expense-manager:latest` (if you configure the secrets, else it skips this part)
+   > For more information on this step, check out the first anwser in [Troubleshooting](https://github.com/Yahg0h/expense-manager#troubleshooting).
 ## Routes
- 
+
+### Root
+
+| Method | Route | Auth | Description |
+|--------|-------|------|-------------|
+| GET | `/` | No | API metadata (name, status, documentation links) |
+
 ### Authentication
  
 | Method | Route | Auth | Description |
@@ -295,7 +317,26 @@ curl -H "Authorization: Bearer YOUR_TOKEN_HERE" \
 - Keep dependencies updated
 - Monitor logs for suspicious activity
 ## Troubleshooting
- 
+
+### Docker Hub Error: "Username is not set"
+
+If you fork this repository and try to run the CI/CD pipeline, you'll see:
+``Error: Username is not set``
+``Error: Password is not set``
+
+**This is expected and secure!** 
+
+**Solution:** If you want to publish to your own Docker Hub account:
+
+1. Create a Docker Hub account (if you don't have one)
+2. Generate an access token: [Docker Hub Settings → Security](https://hub.docker.com/settings/security)
+3. Add GitHub Secrets to your fork:
+   - Go to your fork → **Settings** → **Secrets and variables** → **Actions**
+   - Create `DOCKER_USERNAME` with your Docker Hub username
+   - Create `DOCKER_PASSWORD` with your access token
+4. Now the CI/CD pipeline will push to your Docker Hub account
+
+>**Note:** The CI/CD pipeline will only push if these secrets are configured. Without them, the pipeline succeeds but skips the Docker push step.
 ### Database Connection Error
 **Error**: `Connection refused` or `Access denied`
 **Solution**:

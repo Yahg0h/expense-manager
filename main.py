@@ -125,6 +125,17 @@ class BudgetResponse(BaseModel):
     month_year: str = Field(min_length=1, max_length=7)
     created_at: datetime
 
+# Root route
+@app.get("/", **ROUTE_DOCS["root"])
+def root():
+    # API root endpoint, returns metadata
+    return {
+        "name": "Expense Manager API",
+        "status": "operational",
+        "documentation": "/docs",
+        "openapi": "/openapi.json"
+    }
+
 # Register Route
 @app.post("/register", status_code=201, **ROUTE_DOCS["register"])
 def register(user: UserCreate):
